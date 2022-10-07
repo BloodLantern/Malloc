@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "m_allocator.h": "c",
+        "metadata.h": "c"
+    }
+}
