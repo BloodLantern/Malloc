@@ -70,19 +70,28 @@ int split_block(Metadata* block, size_t neededSize)
         if (block->size - neededSize > sizeof(Metadata)) {
             // Block is big enough to keep a new metadata
             // Place the metadata pointer after the used memory block
-            Metadata* unusedData = block->ptr + neededSize;
+            Metadata* unusedData = block->ptr;
+            move_pointer((char**) &unusedData, neededSize);
             // Insert it in the metadata linked list
             unusedData->next = block->next;
             block->next = unusedData;
             // Adjust the metadata values
             unusedData->free = true;
-            unusedData->ptr = unusedData + sizeof(Metadata);
+            unusedData->ptr = unusedData + 1;
             unusedData->size = block->size - neededSize - sizeof(Metadata);
             block->size = neededSize;
+            // Unfree the splitted memory block
+            block->free = false;
             return 1;
         }
     }
     return 0;
+}
+
+// Moves 'ptr' by 'change' bytes
+void move_pointer(char** ptr, int change)
+{
+    *ptr += change;
 }
 
 void* m_malloc(size_t size)
@@ -91,20 +100,33 @@ void* m_malloc(size_t size)
     Metadata* available = get_free_block(size);
     if (available != NULL) {
         // Try to split the memory block
-        split_block(available, size);
-        available->free = false;
-        return available->ptr;
+        if (split_block(available, size)) {
+            // If it worked, return the available memory block
+            available->free = false;
+            return available->ptr;
+        }
     }
 
     // If a corresponding memory block couldn't be found, create a new one
-    // Create the needed memory block for the metadata
-    Metadata* newData = sbrk(sizeof(Metadata));
+    // Create the needed memory block for the metadata and the value
+    Metadata* newData = sbrk(sizeof(Metadata) + size);
+    // Place this memory block on an 8 bytes adress
+    int modulo = (unsigned long) newData;
+    if (modulo %= 8 > 0) {
+        // Move this pointer by the needed bytes
+        sbrk(modulo);
+        move_pointer((char**) &newData, modulo);
+        // Increase the size of the block before this one
+        for (Metadata* m = metadata; m != NULL; m = m->next)
+            if (m->next == NULL)
+                m->size += modulo;
+    }
     newData->size = size;
     newData->free = false;
     newData->next = NULL;
 
     // And the one for the actual pointer
-    void* new = sbrk(size);
+    void* new = newData + 1;
     newData->ptr = new;
 
     // Return a NULL pointer if an error occured during the allocation
@@ -138,21 +160,31 @@ void* m_realloc(void* ptr, size_t size)
         return m_malloc(size);
 
     // Get the metadata before the one of 'ptr'
-    Metadata* data;
+    Metadata* data = NULL;
     for (Metadata* m = metadata; m != NULL; m = m->next)
         if (m->next != NULL)
             if (m->next->ptr == ptr) {
                 data = m;
                 break;
             }
+    // An error happened somewhere, return NULL
+    if (data == NULL)
+        return NULL;
 
     // Try to merge this block with the ones around it
     switch (merge_blocks(data)) {
         case 1:
+            // A merge was made and 'data->next' is the metadata of the new block
             if (data->next->size == size)
                 return data->ptr;
             if (data->next->size > size) {
-                split_block(data->next, size);
+                if (split_block(data->next, size) == 0)
+                    // If the split couldn't be made
+                    return m_malloc(size);
+                // Else - A split was made
+                // Make sure to move the line break if necessary
+                if (data->next->next == NULL)
+                    m_free(data->next->ptr);
                 return data->ptr;
             }
             // Block size isn't big enough
@@ -161,19 +193,25 @@ void* m_realloc(void* ptr, size_t size)
             
         case -1:
         case 2:
-            // If a merge was made and 'data' is the metadata of the new block
+            // A merge was made and 'data' is the metadata of the new block
             if (data->size == size)
                 return data->ptr;
             if (data->size > size) {
-                split_block(data, size);
+                if (split_block(data, size) == 0)
+                    // If the split couldn't be made
+                    return m_malloc(size);
+                // Else - A split was made
+                // Make sure to move the line break if necessary
+                if (data->next->next == NULL)
+                    m_free(data->next->ptr);
                 return data->ptr;
             }
             // Block size isn't big enough
-            data->next->free = true;
+            data->free = true;
             return m_malloc(size);
 
         case 0:
-            // If a merge couldn't be made, deallocate this block and allocate a new one
+            // A merge couldn't be made, deallocate this block and allocate a new one
             data->next->free = true;
             return m_malloc(size);
     }
@@ -207,7 +245,7 @@ void* m_calloc(size_t nb, size_t size)
  
 void m_free(void* ptr)
 {
-    // Iterate over the metadata to find the one corresponding to this pointer
+    // Iterate over the metadata to find the one before the one corresponding to this pointer
     for (Metadata* m = metadata; m != NULL; m = m->next)
         if (m->next != NULL)
             if (m->next->ptr == ptr) {
@@ -220,7 +258,7 @@ void m_free(void* ptr)
                     case -1:
                     case 2:
                         next = m;
-                        break;
+                        // No need to break
                 }
 
                 // If the block being freed is the last one
@@ -228,9 +266,11 @@ void m_free(void* ptr)
                     // Remove the metadata from the linked list
                     if (m == next) {
                         // If the merge returned -1 or 2
-                        for (Metadata* m2 = metadata; m2 != m; m2++)
-                            if (m2->next == m)
+                        for (Metadata* m2 = metadata; m2 != m; m2 = m2->next)
+                            if (m2->next == m) {
                                 m2->next = NULL;
+                                break;
+                            }
                     } else
                         m->next = NULL;
                     // Move the break
@@ -252,6 +292,16 @@ void m_show_info(void)
     }
 
     int i = 0;
-    for (Metadata* m = metadata; m != NULL; m = m->next, i++)
+    int freeCount = 0;
+    size_t freeSize = 0;
+    size_t totalSize = 0;
+    for (Metadata* m = metadata; m != NULL; m = m->next, i++) {
         printf("\tIndex %-4d: { Adress: %14p, Free: %d, Size: %8ld, Pointer: %14p, Next: %14p }\n", i, m, m->free, m->size, m->ptr, m->next);
+        if (m->free) {
+            freeCount++;
+            freeSize += m->size;
+        }
+        totalSize += m->size;
+    }
+    printf("\tTotal     : { Free metadatas: %4d, Free metadatas total size: %8ld, Metadatas total size: %8ld }\n", freeCount, freeSize, totalSize);
 }
