@@ -132,11 +132,11 @@ void test_alloc_free()
 // Number of variable allocation
 #define ALLOC_COUNT 100
 // Size of the allocations
-#define ALLOC_SIZE sizeof(ALLOC_TYPE) * 10000
+#define ALLOC_SIZE (sizeof(ALLOC_TYPE) * 1 * 1024 * 1024 * 1024)
 // Whether to reallocate all the variables
-#define REALLOC false
+#define REALLOC true
 // Size of the reallocations
-#define REALLOC_SIZE sizeof(ALLOC_TYPE) * 2000
+#define REALLOC_SIZE (sizeof(ALLOC_TYPE) * 2000)
 // Whether to start freeing from the end or from the beginning of the variables
 #define DEALLOC_START_END false
 
@@ -144,31 +144,31 @@ void test_huge_allocation()
 {
     ALLOC_TYPE* first[ALLOC_COUNT];
     m_show_info();
-    printf("Allocating %d values of size %ld...\n", ALLOC_COUNT, ALLOC_SIZE);
+    printf(ANSI_COLOR_YELLOW "Allocating %d values of size %ld...\n", ALLOC_COUNT, ALLOC_SIZE);
     for (int i = 0; i < ALLOC_COUNT; i++)
         if (i % 7 == 0)
             first[i] = m_calloc(1, ALLOC_SIZE);
         else
             first[i] = m_malloc(ALLOC_SIZE);
-    printf("Values allocated.\n");
+    printf(ANSI_COLOR_GREEN "Values allocated.\n");
     m_show_info();
 
 #if REALLOC
-    printf("Reallocating memory with new size %ld...\n", REALLOC_SIZE);
+    printf(ANSI_COLOR_YELLOW "Reallocating memory with new size %ld...\n", REALLOC_SIZE);
     for (int i = 0; i < ALLOC_COUNT; i++)
         first[i] = m_realloc(first[i], REALLOC_SIZE);
-    printf("Memory reallocated.\n");
+    printf(ANSI_COLOR_GREEN "Memory reallocated.\n");
     m_show_info();
 #endif // REALLOC
 
-	printf("Freeing memory...\n");
+	printf(ANSI_COLOR_YELLOW "Freeing memory...\n");
 #if DEALLOC_START_END
    for (int i = ALLOC_COUNT - 1; i >= 0; i--)
 #else
    for (int i = 0; i < ALLOC_COUNT; i++)
 #endif // DEALLOC_START_END
       m_free(first[i]);
-   printf("Memory freed.\n");
+   printf(ANSI_COLOR_GREEN "Memory freed.\n");
    m_show_info();
 }
  

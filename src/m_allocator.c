@@ -274,10 +274,10 @@ void m_free(void* ptr)
                     } else
                         m->next = NULL;
                     // Move the break
-                    printf("Reducing program memory allocation.\n");
-                    printf("Break position before reduction: %14p\n", sbrk(0));
+                    printf(ANSI_COLOR_YELLOW "Reducing program memory allocation.\n");
+                    printf(ANSI_COLOR_YELLOW "Break position before reduction: %14p\n", sbrk(0));
                     brk(sbrk(0) - next->size - sizeof(Metadata));
-                    printf("Break position after reduction:  %14p\n", sbrk(0));
+                    printf(ANSI_COLOR_YELLOW "Break position after reduction:  %14p\n", sbrk(0));
                 }
                 break;
             }
@@ -285,9 +285,9 @@ void m_free(void* ptr)
  
 void m_show_info(void)
 {
-    printf("Metadata infos:\n");
+    printf(ANSI_COLOR_GREEN "Metadata infos:\n");
     if (metadata == NULL) {
-        printf("\tEmpty Metadata\n");
+        printf(ANSI_COLOR_RED "\tEmpty Metadata\n");
         return;
     }
 
@@ -296,12 +296,29 @@ void m_show_info(void)
     size_t freeSize = 0;
     size_t totalSize = 0;
     for (Metadata* m = metadata; m != NULL; m = m->next, i++) {
-        printf("\tIndex %-4d: { Adress: %14p, Free: %d, Size: %8ld, Pointer: %14p, Next: %14p }\n", i, m, m->free, m->size, m->ptr, m->next);
+        printf(ANSI_COLOR_RESET "\tIndex " ANSI_COLOR_GREEN "%-4d"
+        ANSI_COLOR_RESET ": { "
+        ANSI_COLOR_YELLOW "Adress: %14p"
+        ANSI_COLOR_RESET ", "
+        ANSI_COLOR_BLUE "Free: %d"
+        ANSI_COLOR_RESET ", "
+        ANSI_COLOR_MAGENTA "Size: %8ld"
+        ANSI_COLOR_RESET ", "
+        ANSI_COLOR_CYAN "Pointer: %14p"
+        ANSI_COLOR_RESET ", "
+        ANSI_COLOR_YELLOW "Next: %14p"
+        ANSI_COLOR_RESET " }\n", i, m, m->free, m->size, m->ptr, m->next);
         if (m->free) {
             freeCount++;
             freeSize += m->size;
         }
         totalSize += m->size;
     }
-    printf("\tTotal     : { Free metadatas: %4d, Free metadatas total size: %8ld, Metadatas total size: %8ld }\n", freeCount, freeSize, totalSize);
+    printf("\tTotal     : { "
+    ANSI_COLOR_BLUE "Free metadatas: %4d"
+    ANSI_COLOR_RESET ", "
+    ANSI_COLOR_MAGENTA "Free metadatas total size: %8ld"
+    ANSI_COLOR_RESET ", "
+    ANSI_COLOR_MAGENTA"Metadatas total size: %13ld"
+    ANSI_COLOR_RESET " }\n", freeCount, freeSize, totalSize);
 }
