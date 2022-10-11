@@ -190,10 +190,10 @@ void* m_realloc(void* ptr, size_t size)
                     // If the split couldn't be made
                     return copy_value(m_malloc(size), ptr);
                 // Else - A split was made
+                copy_value(data->ptr, ptr);
                 // Make sure to move the line break if necessary
                 if (data->next->next == NULL)
                     m_free(data->next->ptr);
-                copy_value(data->ptr, ptr);
                 return data->ptr;
             }
             // Block size isn't big enough
