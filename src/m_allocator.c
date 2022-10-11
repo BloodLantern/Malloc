@@ -1,5 +1,5 @@
 #include <malloc.h> // Nécessaire pour les hooks
-#include <m_allocator.h>
+#include "m_allocator.h"
 #include <unistd.h>
 #include <stdio.h>
 
@@ -59,7 +59,7 @@ int merge_blocks(Metadata* beforeBlock)
     return 0;
 }
 
-// Return values:
+// Return values:z
 // 0 if the split couldn't be made
 // 1 if the split was made
 int split_block(Metadata* block, size_t neededSize)
@@ -92,6 +92,14 @@ int split_block(Metadata* block, size_t neededSize)
 void move_pointer(char** ptr, int change)
 {
     *ptr += change;
+}
+
+void* copy_value(void* newLocation, void* oldLocation)
+{
+    int* newVal = newLocation;
+    int* oldVal = oldLocation;
+    *newVal = *oldVal;
+    return newVal;
 }
 
 void* m_malloc(size_t size)
@@ -180,16 +188,17 @@ void* m_realloc(void* ptr, size_t size)
             if (data->next->size > size) {
                 if (split_block(data->next, size) == 0)
                     // If the split couldn't be made
-                    return m_malloc(size);
+                    return copy_value(m_malloc(size), ptr);
                 // Else - A split was made
                 // Make sure to move the line break if necessary
                 if (data->next->next == NULL)
                     m_free(data->next->ptr);
+                copy_value(data->ptr, ptr);
                 return data->ptr;
             }
             // Block size isn't big enough
             data->next->free = true;
-            return m_malloc(size);
+            return copy_value(m_malloc(size), ptr);
             
         case -1:
         case 2:
@@ -199,8 +208,9 @@ void* m_realloc(void* ptr, size_t size)
             if (data->size > size) {
                 if (split_block(data, size) == 0)
                     // If the split couldn't be made
-                    return m_malloc(size);
+                    return copy_value(m_malloc(size), ptr);
                 // Else - A split was made
+                copy_value(data->ptr, ptr);
                 // Make sure to move the line break if necessary
                 if (data->next->next == NULL)
                     m_free(data->next->ptr);
@@ -208,12 +218,12 @@ void* m_realloc(void* ptr, size_t size)
             }
             // Block size isn't big enough
             data->free = true;
-            return m_malloc(size);
+            return copy_value(m_malloc(size), ptr);
 
         case 0:
             // A merge couldn't be made, deallocate this block and allocate a new one
             data->next->free = true;
-            return m_malloc(size);
+            return copy_value(m_malloc(size), ptr);
     }
 
     return NULL;

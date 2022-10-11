@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
  
-#include <m_allocator.h>
+#include "m_allocator.h"
+#include "m_debug_allocator.h"
  
 void test_malloc()
 {
@@ -130,9 +131,9 @@ void test_alloc_free()
 // Var type to allocate
 #define ALLOC_TYPE char
 // Number of variable allocation
-#define ALLOC_COUNT 100
+#define ALLOC_COUNT 10000
 // Size of the allocations
-#define ALLOC_SIZE (sizeof(ALLOC_TYPE) * 1 * 1024 * 1024 * 1024)
+#define ALLOC_SIZE (sizeof(ALLOC_TYPE) * 500)
 // Whether to reallocate all the variables
 #define REALLOC true
 // Size of the reallocations
@@ -171,11 +172,27 @@ void test_huge_allocation()
    printf(ANSI_COLOR_GREEN "Memory freed.\n");
    m_show_info();
 }
+
+void testBufferOverflow(void)
+{
+    char* array  = heapDebugAlloc(24);
+    char* array2 = heapDebugAlloc(8);
+    for (int i = 0; i < 8; ++i) // Good
+        array2[i] = 'a' + i;
+    for (int i = 0; i < 25; ++i) // Bad (overflow)
+        array[i] = 'a' + i;
+    
+    printf("array  = %.*s\n", 24, array);
+    printf("array2 = %.*s\n", 8, array2);
+    heapDebugFree(array);
+    heapDebugFree(array2);
+}
  
 int main()
 {
     m_setup_hooks();
     test_huge_allocation();
+    //testBufferOverflow();
  
     return 0;
 }

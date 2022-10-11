@@ -3,7 +3,7 @@ CPPFLAGS=-MMD
 LDFLAGS=
 LDLIBS=
 
-OBJS=tests/test_allocator.o src/m_allocator.o
+OBJS=tests/test_allocator.o src/m_allocator.o src/m_debug_allocator.o
 DEPS=$(OBJS:.o=.d)
 
 .PHONY: all clean
